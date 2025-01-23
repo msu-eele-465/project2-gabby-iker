@@ -1,4 +1,10 @@
 ;-------------------------------------------------------------------------------
+; EELE 465, Project 2, 23 January 2025
+; Gabriella Lord
+;
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
 ; Include files
             .cdecls C,LIST,"msp430.h"  ; Include device header file
 ;-------------------------------------------------------------------------------
@@ -16,11 +22,29 @@
 RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 
 ;------------------------------------------------------------------------------
+; Set Constants
+;------------------------------------------------------------------------------
+
+;-End Constants----------------------------------------------------------------
+
+;------------------------------------------------------------------------------
 ; Initialize
 ;------------------------------------------------------------------------------
 
 init:
-    mov.w   #WDTPW+WDTHOLD,&WDTCT           ; stop watchdog timer     
+    mov.w   #WDTPW+WDTHOLD,&WDTCTL  ; Stop WDT   
+    
+    ; Initializing I2C
+    bic.b   #UCA10, &UCB0CTLW0              ; Master address is 7 bits
+    bic.b   #UCSLA10, &UCB0CTLW0            ; Slave address is 7 bits
+    bic.b   #UCMM, &UCB0CTLW0               ; Single master
+    bis.b   #UCMST, &UCB0CTLW0              ; Set master mode
+    bis.b   #UCMODE_3, &UCB0CTLW0           ; I2C mode
+    bis.b   #UCSSEL_3, &UCB0CTLW0           ; SMCLK clock source 1 MHz
+    bis.b   #UCTXACK, &UCB0CTLW0            ; ACK the slave address
+    bis.b   #UCTR, &UCB0CTLW0               ; Transmitter mode
+    bic.b   #UCTXNACK, &UCB0CTLW0           ; Acknowledge normally
+
     
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
 ;-End Initialize---------------------------------------------------------------
