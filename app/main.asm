@@ -15,24 +15,29 @@
 
 RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 
+;------------------------------------------------------------------------------
+; Initialize
+;------------------------------------------------------------------------------
 
 init:
-            ; stop watchdog timer
-            mov.w   #WDTPW+WDTHOLD,&WDTCTL
-
-            ; Disable low-power mode
-            bic.w   #LOCKLPM5,&PM5CTL0
-
-main:
-
-            nop 
-            jmp main
-            nop
-
+    mov.w   #WDTPW+WDTHOLD,&WDTCT           ; stop watchdog timer     
+    
+    bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
+;-End Initialize---------------------------------------------------------------
 
 
 ;------------------------------------------------------------------------------
-;           Interrupt Vectors
+; Main
+;------------------------------------------------------------------------------
+main:
+
+    nop 
+    jmp main
+    nop
+;-End Main---------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Interrupt Vectors
 ;------------------------------------------------------------------------------
             .sect   RESET_VECTOR            ; MSP430 RESET Vector
             .short  RESET                   ;
