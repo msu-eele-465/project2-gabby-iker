@@ -34,7 +34,7 @@ RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 init:
     mov.w   #WDTPW+WDTHOLD,&WDTCTL  ; Stop WDT   
     
-    ; Initializing I2C
+    ; Initializing I2C (000111110)
     bic.b   #UCA10, &UCB0CTLW0              ; Master address is 7 bits
     bic.b   #UCSLA10, &UCB0CTLW0            ; Slave address is 7 bits
     bic.b   #UCMM, &UCB0CTLW0               ; Single master
@@ -44,6 +44,18 @@ init:
     bis.b   #UCTXACK, &UCB0CTLW0            ; ACK the slave address
     bis.b   #UCTR, &UCB0CTLW0               ; Transmitter mode
     bic.b   #UCTXNACK, &UCB0CTLW0           ; Acknowledge normally
+
+    ; Configure P1.3 to use its ??? function
+    bis.b	#BIT3, &P1SEL0
+	bic.b	#BIT3, &P1SEL1
+;    bic.b   #BIT3,&P1OUT            ; Clear P1.0 output
+;    bis.b   #BIT3,&P1DIR            ; P1.0 output
+
+    ; Configure P1.2 to use its analog function (A2)
+    bis.b	#BIT2, &P1SEL0
+	bic.b	#BIT2, &P1SEL1
+;    bic.b   #BIT2,&P1OUT            ; Clear P1.0 output
+;    bis.b   #BIT2,&P1DIR            ; P1.0 output
 
     
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
