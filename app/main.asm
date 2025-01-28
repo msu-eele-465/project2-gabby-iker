@@ -29,13 +29,13 @@ RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 SDA			.set	BIT0					; I2C data pin
 SCL			.set	BIT1					; I2C clock pin
 I2C         .set    SDA + SCL               ; I2C pins
-I2CIN       .set    P6IN                    ; I2C input (likely unused)
-I2COUT      .set    P6OUT                   ; I2C output
-I2CDIR      .set    P6DIR                   ; I2C direction
-12CREN      .set    P6REN                   ; I2C pulling enable
-I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
-I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
-I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
+;I2CIN       .set    P6IN                    ; I2C input (likely unused)
+;I2COUT      .set    P6OUT                   ; I2C output
+;I2CDIR      .set    P6DIR                   ; I2C direction
+;12CREN      .set    P6REN                   ; I2C pulling enable
+;I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
+;I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
+;I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
 
 ;-End Constants----------------------------------------------------------------
 
@@ -44,7 +44,20 @@ I2CSELC     .set    P6SELC                  ; I2C complement selection (likely u
 ;------------------------------------------------------------------------------
 
 init:
-    mov.w   #WDTPW+WDTHOLD,&WDTCTL          ; Stop WDT   
+    mov.w   #WDTPW+WDTHOLD,&WDTCTL          ; Stop WDT
+
+    ; Initialize I2C data pin
+    bic.b	#SDA, &P6SEL0                   ; General purpose I/O is selected
+	bic.b	#SDA, &P6SEL1                   ; General purpose I/O is selected
+    bis.b   #SDA, &P6OUT                    ; Set I2C output high
+    bis.b   #SDA, &P6DIR                    ; SDA output direction (initially)
+    bic.b   #SDA, &P6REN                    ; PUD resistor disabled
+
+    ; Initialize I2C clock pin
+    bic.b	#SCL, &P6SEL0                   ; General purpose I/O is selected
+	bic.b	#SCL, &P6SEL1                   ; General purpose I/O is selected
+    bis.b   #SCL, &P6OUT                    ; Set I2C output high
+    bis.b   #SCL, &P6DIR                    ; SDA output direction
 
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
 ;-End Initialize---------------------------------------------------------------
