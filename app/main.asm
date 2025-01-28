@@ -2,6 +2,8 @@
 ; EELE 465, Project 2, 23 January 2025
 ; Gabriella Lord
 ;
+; P6.0 SDA (Serial Data Line)
+; P6.1 SCL (Serial clock line)
 ;-------------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
@@ -24,6 +26,11 @@ RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 ;------------------------------------------------------------------------------
 ; Set Constants
 ;------------------------------------------------------------------------------
+SDA			.set	BIT0					; I2C data pin
+SCL			.set	BIT1					; I2C clock pin
+I2C         .set    SDA + SCL               ; I2C pins
+I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
+I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
 
 ;-End Constants----------------------------------------------------------------
 
@@ -32,32 +39,8 @@ RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 ;------------------------------------------------------------------------------
 
 init:
-    mov.w   #WDTPW+WDTHOLD,&WDTCTL  ; Stop WDT   
-    
-    ; Initializing I2C (000111110)
-    bic.b   #UCA10, &UCB0CTLW0              ; Master address is 7 bits
-    bic.b   #UCSLA10, &UCB0CTLW0            ; Slave address is 7 bits
-    bic.b   #UCMM, &UCB0CTLW0               ; Single master
-    bis.b   #UCMST, &UCB0CTLW0              ; Set master mode
-    bis.b   #UCMODE_3, &UCB0CTLW0           ; I2C mode
-    bis.b   #UCSSEL_3, &UCB0CTLW0           ; SMCLK clock source 1 MHz
-    bis.b   #UCTXACK, &UCB0CTLW0            ; ACK the slave address
-    bis.b   #UCTR, &UCB0CTLW0               ; Transmitter mode
-    bic.b   #UCTXNACK, &UCB0CTLW0           ; Acknowledge normally
+    mov.w   #WDTPW+WDTHOLD,&WDTCTL          ; Stop WDT   
 
-    ; Configure P1.3 to use its ??? function
-    bis.b	#BIT3, &P1SEL0
-	bic.b	#BIT3, &P1SEL1
-;    bic.b   #BIT3,&P1OUT            ; Clear P1.0 output
-;    bis.b   #BIT3,&P1DIR            ; P1.0 output
-
-    ; Configure P1.2 to use its analog function (A2)
-    bis.b	#BIT2, &P1SEL0
-	bic.b	#BIT2, &P1SEL1
-;    bic.b   #BIT2,&P1OUT            ; Clear P1.0 output
-;    bis.b   #BIT2,&P1DIR            ; P1.0 output
-
-    
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
 ;-End Initialize---------------------------------------------------------------
 
@@ -66,11 +49,42 @@ init:
 ; Main
 ;------------------------------------------------------------------------------
 main:
-
-    nop 
+    nop
     jmp main
     nop
+
 ;-End Main---------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Start Condition
+;------------------------------------------------------------------------------
+i2c_start:
+    nop
+
+;-End Start Condition---------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; End Condition
+;------------------------------------------------------------------------------
+i2c_end:
+    nop
+
+;-End End Condition---------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Delay loop
+
+;------------------------------------------------------------------------------
+delay:
+    mov.w   #088F6h,R15             ; Initialize inner loop counter for 100 ms delay
+L1:
+    dec.w   R15                     ; Decrement inner loop counter
+    jnz     L1                      ; Inner loop is not done; keep decrementing
+
+    ret                             ; Outer loop is done
+
+;-End Delay----------------------------------------------------------------------------
+
 
 ;------------------------------------------------------------------------------
 ; Interrupt Vectors
