@@ -29,13 +29,13 @@ RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 SDA			.set	BIT0					; I2C data pin
 SCL			.set	BIT1					; I2C clock pin
 I2C         .set    SDA + SCL               ; I2C pins
-I2CIN       .set    P6IN                    ; I2C input (likely unused)
-I2COUT      .set    P6OUT                   ; I2C output
-I2CDIR      .set    P6DIR                   ; I2C direction
-12CREN      .set    P6REN                   ; I2C pulling enable
-I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
-I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
-I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
+;I2CIN       .set    P6IN                    ; I2C input (likely unused)
+;I2COUT      .set    P6OUT                   ; I2C output
+;I2CDIR      .set    P6DIR                   ; I2C direction
+;12CREN      .set    P6REN                   ; I2C pulling enable
+;I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
+;I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
+;I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
 
 ;-End Constants----------------------------------------------------------------
 
@@ -55,6 +55,8 @@ init:
 ;------------------------------------------------------------------------------
 main:
     nop
+    call #i2c_start
+    call #i2c_end
     jmp main
     nop
 
@@ -80,7 +82,7 @@ i2c_end:
     bic.b   #SDA, &P6OUT
     bis.b   #SCL, &P6OUT        ; 
     call    #delay              ; Delay
-    bis.b	#SDA, &I2COUT       ; Pull SDA high
+    bis.b	#SDA, &P6OUT       ; Pull SDA high
     ret
 
 ;-End End Condition---------------------------------------------------------------------
