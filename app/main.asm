@@ -30,7 +30,7 @@ RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 SDA			.set	BIT0					; I2C data pin
 SCL			.set	BIT1					; I2C clock pin
 I2C         .set    SDA + SCL               ; I2C pins
-;I2CIN       .set    P6IN                    ; I2C input (likely unused)
+;I2CIN       .set    P6IN                    ; I2C input
 ;I2COUT      .set    P6OUT                   ; I2C output
 ;I2CDIR      .set    P6DIR                   ; I2C direction
 ;12CREN      .set    P6REN                   ; I2C pulling enable
@@ -40,6 +40,7 @@ I2C         .set    SDA + SCL               ; I2C pins
 Delay       .set    R15
 Send_count  .set    R14
 Message     .set    R13
+AckReg      .set    R12                     ; Acknowledge flag
 ;-End Constants----------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
@@ -47,7 +48,20 @@ Message     .set    R13
 ;------------------------------------------------------------------------------
 
 init:
-    mov.w   #WDTPW+WDTHOLD,&WDTCTL          ; Stop WDT   
+    mov.w   #WDTPW+WDTHOLD,&WDTCTL          ; Stop WDT
+
+    ; Initialize the SDA
+    bic.b   #SDA, &P6SEL0                   ; GPIO fuctionality
+    bic.b   #SDA, &P6SEL1
+    bis.b   #SDA, &P6DIR                    ; Output mode (initially)
+    bis.b   #SDA, &P6OUT                    ; Initially high
+    bic.b   #SDA, &P6REN                    ; Input PUD resistor disabled
+
+    ; Initialize the SCL
+    bic.b   #SCL, &P6SEL0                   ; GPIO fuctionality
+    bic.b   #SCL, &P6SEL1
+    bis.b   #SCL, &P6DIR                    ; Output mode
+    bis.b   #SCL, &P6OUT                    ; Initially high
 
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
 ;-End Initialize---------------------------------------------------------------
@@ -63,7 +77,6 @@ main:
     call #send_message
     call #i2c_end
     jmp main
-    nop
 
 ;-End Main---------------------------------------------------------------------
 
@@ -71,11 +84,14 @@ main:
 ; Start Condition
 ;------------------------------------------------------------------------------
 i2c_start:
-    bic.b   #SDA, &P6OUT
+    bic.b   #SDA, &P6OUT                    ; Set SDA low
+    mov.w   #01h, R15                       ; Short delay
     call    #delay
 
-    bic.b   #SCL, &P6OUT
+    bic.b   #SCL, &P6OUT                    ; Set SCL low
+    mov.w   #05h, R15                       ; Long delay
     call    #delay
+
     ret
 
 ;-End Start Condition---------------------------------------------------------------------
@@ -84,10 +100,15 @@ i2c_start:
 ; End Condition
 ;------------------------------------------------------------------------------
 i2c_end:
-    bic.b   #SDA, &P6OUT
-    bis.b   #SCL, &P6OUT        ; 
+    ;bic.b   #SDA, &P6OUT
+    bis.b   #SCL, &P6OUT        ; Set SCL high
+    mov.w   #01h, R15           ; Short delay
     call    #delay              ; Delay
-    bis.b	#SDA, &P6OUT       ; Pull SDA high
+
+    bis.b	#SDA, &P6OUT        ; Pull SDA high
+    mov.w   #05h, R15           ; Long delay
+    call    #delay
+
     ret
 
 ;-End End Condition------------------------------------------------------------
@@ -98,6 +119,7 @@ send_message:
     bis.b   #0x01, &P6DIR    ; Configura P6.0 como salida (P6DIR = 0x01)
 L2  call    #send_byte
     bic.b   #SCL, &P6OUT
+    mov.w	#5, R15     		; Long delay 
     call    #delay
     rla.b   Message                    
     dec.w   Send_count
@@ -113,6 +135,7 @@ send_byte:
 
     bis.b   #0x01, &P6OUT    ; If X is 1, set P6.0 high/Set P6.0 high (1)
     bis.b   #SDA, &P6OUT
+    mov.w	#5, R15     		; Long delay
     call    #delay
     bis.b   #SCL, &P6OUT
     jmp     END_SEND         
@@ -120,6 +143,7 @@ send_byte:
 P6OUT_0:                     ; Jump here if X was 0
     bic.b   #0x01, &P6OUT    ; Set P6.0 low (0)
     bic.b   #SDA, &P6OUT
+    mov.w	#5, R15     		; Long delay
     call    #delay
     bis.b   #SCL, &P6OUT
     ret
@@ -127,15 +151,38 @@ P6OUT_0:                     ; Jump here if X was 0
 END_SEND:
     ret
 ; Delay loop
-
 ;------------------------------------------------------------------------------
 delay:
-    mov.w   #088F6h, Delay          ; Initialize inner loop counter for 100 ms delay
-L1:
-    dec.w   Delay                   ; Decrement inner loop counter
-    jnz     L1                      ; Inner loop is not done; keep decrementing
+    dec.w   R15                 ; Decrement inner loop counter
+    jnz     delay               ; Loop is not done; keep decrementing
+    ret                         ; Loop is done
 
-    ret                             ; Outer loop is done
+;-End Delay----------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Acknowledge
+;------------------------------------------------------------------------------
+i2c_ack_recieve:
+    bis.b   #SDA, &P6DIR        ; Input mode (for now)
+    bis.b	#SDA, &P6OUT		; Set pull-up resistor
+	bis.b	#SDA, &P6REN		; Enable input PUD resistor
+	mov.w	#5, R15     		; Long delay
+
+    bis.b   #SCL, P6OUT         ; Set SCL high
+    mov.w   #01h, R15           ; Short delay
+    call    #delay
+
+    mov.w   #P6IN, AckReg       ; Capture potential ACK/NACK
+    and.b	#SDA, AckReg		; Clear all unimportant bits
+
+    bic.b   #SCL, P6OUT         ; Set SCL low
+    mov.w   #05h, R15           ; Long delay
+    call    #delay
+
+    bic.b	#SDA, &P6REN		; Disable input PUD resistor
+    bis.b   #SDA, &P6DIR        ; Output mode
+    
+    ret
 
 ;-End Delay----------------------------------------------------------------------------
 
