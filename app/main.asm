@@ -29,13 +29,14 @@ RESET       mov.w   #__STACK_END,SP         ; Initialize stack pointer
 SDA			.set	BIT0					; I2C data pin
 SCL			.set	BIT1					; I2C clock pin
 I2C         .set    SDA + SCL               ; I2C pins
-;I2CIN       .set    P6IN                    ; I2C input (likely unused)
+;I2CIN       .set    P6IN                    ; I2C input
 ;I2COUT      .set    P6OUT                   ; I2C output
 ;I2CDIR      .set    P6DIR                   ; I2C direction
 ;12CREN      .set    P6REN                   ; I2C pulling enable
 ;I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
 ;I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
 ;I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
+Delay_count .set    R15                     ; Delay counter
 
 ;-End Constants----------------------------------------------------------------
 
@@ -44,7 +45,20 @@ I2C         .set    SDA + SCL               ; I2C pins
 ;------------------------------------------------------------------------------
 
 init:
-    mov.w   #WDTPW+WDTHOLD,&WDTCTL          ; Stop WDT   
+    mov.w   #WDTPW+WDTHOLD,&WDTCTL          ; Stop WDT
+
+    ; Initialize the SDA
+    bic.b   #SDA, &P6SEL0                   ; GPIO fuctionality
+    bic.b   #SDA, &P6SEL1
+    bis.b   #SDA, &P6DIR                    ; Output mode (initially)
+    bis.b   #SDA, &P6OUT                    ; Initially high
+    bic.b   #SDA, &P6REN                    ; Input PUD resistor disabled
+
+    ; Initialize the SCL
+    bic.b   #SCL, &P6SEL0                   ; GPIO fuctionality
+    bic.b   #SCL, &P6SEL1
+    bis.b   #SCL, &P6DIR                    ; Output mode
+    bis.b   #SCL, &P6OUT                    ; Initially high
 
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
 ;-End Initialize---------------------------------------------------------------
@@ -54,11 +68,9 @@ init:
 ; Main
 ;------------------------------------------------------------------------------
 main:
-    nop
     call #i2c_start
     call #i2c_end
     jmp main
-    nop
 
 ;-End Main---------------------------------------------------------------------
 
@@ -67,7 +79,8 @@ main:
 ;------------------------------------------------------------------------------
 i2c_start:
     bic.b   #SDA, &P6OUT
-    call    #delay
+    ;mov.w   #05h, Delay_count
+    ;call    #delay
 
     bic.b   #SCL, &P6OUT
     call    #delay
@@ -79,25 +92,35 @@ i2c_start:
 ; End Condition
 ;------------------------------------------------------------------------------
 i2c_end:
-    bic.b   #SDA, &P6OUT
+    ;bic.b   #SDA, &P6OUT
     bis.b   #SCL, &P6OUT        ; 
     call    #delay              ; Delay
     bis.b	#SDA, &P6OUT       ; Pull SDA high
+    call    #delay
     ret
 
 ;-End End Condition---------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Delay loop
-
 ;------------------------------------------------------------------------------
 delay:
-    mov.w   #088F6h,R15             ; Initialize inner loop counter for 100 ms delay
-L1:
+    mov.w   #05h,R15             ; Initialize inner loop counter for 100 ms delay
+delay_continue:
     dec.w   R15                     ; Decrement inner loop counter
-    jnz     L1                      ; Inner loop is not done; keep decrementing
+    jnz     delay_continue          ; Inner loop is not done; keep decrementing
 
     ret                             ; Outer loop is done
+
+;-End Delay----------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Acknowledge
+;------------------------------------------------------------------------------
+;i2c_ack_recieve:
+;    bic.b   #SCL, P6OUT
+;    call    #delay
+
 
 ;-End Delay----------------------------------------------------------------------------
 
