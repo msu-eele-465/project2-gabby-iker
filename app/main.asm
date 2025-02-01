@@ -37,8 +37,9 @@ I2C         .set    SDA + SCL               ; I2C pins
 ;I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
 ;I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
 ;I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
-Delay       .set    R15                     ; Delay register
-
+Delay       .set    R15
+Send_count  .set    R14
+Message     .set    R13
 ;-End Constants----------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
@@ -57,7 +58,9 @@ init:
 ;------------------------------------------------------------------------------
 main:
     nop
+    mov.b   #055h, Message
     call #i2c_start
+    call #send_message
     call #i2c_end
     jmp main
     nop
@@ -87,9 +90,42 @@ i2c_end:
     bis.b	#SDA, &P6OUT       ; Pull SDA high
     ret
 
-;-End End Condition---------------------------------------------------------------------
+;-End End Condition------------------------------------------------------------
 
+;-Send Message-----------------------------------------------------------------
+send_message:
+    mov.b   #07h, Send_count
+    bis.b   #0x01, &P6DIR    ; Configura P6.0 como salida (P6DIR = 0x01)
+L2  call    #send_byte
+    bic.b   #SCL, &P6OUT
+    call    #delay
+    rla.b   Message                    
+    dec.w   Send_count
+    jnz     L2
+    ret
 ;------------------------------------------------------------------------------
+;Send Byte--------------------------------------------------------------------
+send_byte:
+
+    ; Read the value of X (for example, X is stored in R12)
+    tst.b   Message          ; Compare X (stored in R13) with 0
+    jz      P6OUT_0          ; If X is 0, jump to P6OUT_0 (set P6.0 low)
+
+    bis.b   #0x01, &P6OUT    ; If X is 1, set P6.0 high/Set P6.0 high (1)
+    bis.b   #SDA, &P6OUT
+    call    #delay
+    bis.b   #SCL, &P6OUT
+    jmp     END_SEND         
+
+P6OUT_0:                     ; Jump here if X was 0
+    bic.b   #0x01, &P6OUT    ; Set P6.0 low (0)
+    bic.b   #SDA, &P6OUT
+    call    #delay
+    bis.b   #SCL, &P6OUT
+    ret
+
+END_SEND:
+    ret
 ; Delay loop
 
 ;------------------------------------------------------------------------------
