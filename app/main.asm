@@ -36,7 +36,7 @@ I2C         .set    SDA + SCL               ; I2C pins
 ;I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
 ;I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
 ;I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
-Delay_count .set    R15                     ; Delay counter
+AckReg      .set    R12                     ; Acknowledge flag
 
 ;-End Constants----------------------------------------------------------------
 
@@ -78,12 +78,14 @@ main:
 ; Start Condition
 ;------------------------------------------------------------------------------
 i2c_start:
-    bic.b   #SDA, &P6OUT
-    ;mov.w   #05h, Delay_count
-    ;call    #delay
-
-    bic.b   #SCL, &P6OUT
+    bic.b   #SDA, &P6OUT                    ; Set SDA low
+    mov.w   #01h, R15                       ; Short delay
     call    #delay
+
+    bic.b   #SCL, &P6OUT                    ; Set SCL low
+    mov.w   #05h, R15                       ; Long delay
+    call    #delay
+
     ret
 
 ;-End Start Condition---------------------------------------------------------------------
@@ -93,10 +95,14 @@ i2c_start:
 ;------------------------------------------------------------------------------
 i2c_end:
     ;bic.b   #SDA, &P6OUT
-    bis.b   #SCL, &P6OUT        ; 
+    bis.b   #SCL, &P6OUT        ; Set SCL high
+    mov.w   #01h, R15           ; Short delay
     call    #delay              ; Delay
-    bis.b	#SDA, &P6OUT       ; Pull SDA high
+
+    bis.b	#SDA, &P6OUT        ; Pull SDA high
+    mov.w   #05h, R15           ; Long delay
     call    #delay
+
     ret
 
 ;-End End Condition---------------------------------------------------------------------
@@ -105,22 +111,36 @@ i2c_end:
 ; Delay loop
 ;------------------------------------------------------------------------------
 delay:
-    mov.w   #05h,R15             ; Initialize inner loop counter for 100 ms delay
-delay_continue:
-    dec.w   R15                     ; Decrement inner loop counter
-    jnz     delay_continue          ; Inner loop is not done; keep decrementing
-
-    ret                             ; Outer loop is done
+    dec.w   R15                 ; Decrement inner loop counter
+    jnz     delay               ; Loop is not done; keep decrementing
+    ret                         ; Loop is done
 
 ;-End Delay----------------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Acknowledge
 ;------------------------------------------------------------------------------
-;i2c_ack_recieve:
-;    bic.b   #SCL, P6OUT
-;    call    #delay
+i2c_ack_recieve:
+    bis.b   #SDA, &P6DIR        ; Input mode (for now)
+    bis.b	#SDA, &P6OUT		; Set pull-up resistor
+	bis.b	#SDA, &P6REN		; Enable input PUD resistor
+	mov.w	#5, R15     		; Long delay
 
+    bis.b   #SCL, P6OUT         ; Set SCL high
+    mov.w   #01h, R15           ; Short delay
+    call    #delay
+
+    mov.w   #P6IN, AckReg       ; Capture potential ACK/NACK
+    and.b	#SDA, AckReg		; Clear all unimportant bits
+
+    bic.b   #SCL, P6OUT         ; Set SCL low
+    mov.w   #05h, R15           ; Long delay
+    call    #delay
+
+    bic.b	#SDA, &P6REN		; Disable input PUD resistor
+    bis.b   #SDA, &P6DIR        ; Output mode
+    
+    ret
 
 ;-End Delay----------------------------------------------------------------------------
 
