@@ -73,11 +73,11 @@ init:
 main:
     nop
     mov.b   #055h, Message
-    ;rla.b   Message
     call    #i2c_start
     call    #send_message
+    call    #i2c_send_ack
     call    #i2c_end
-    jmp main
+    jmp     main
 
 ;-End Main---------------------------------------------------------------------
 
@@ -101,9 +101,12 @@ i2c_start:
 ; End Condition
 ;------------------------------------------------------------------------------
 i2c_end:
-    ;bic.b   #SDA, &P6OUT
+    bic.b   #SDA, &P6OUT
+    mov.w   #05h, Delay
+    call    #delay
+    
     bis.b   #SCL, &P6OUT        ; Set SCL high
-    mov.w   #01h, R15           ; Short delay
+    mov.w   #05h, R15           ; Short delay
     call    #delay              ; Delay
 
     bis.b	#SDA, &P6OUT        ; Pull SDA high
@@ -123,11 +126,6 @@ L2  bic.b   #SCL, &P6OUT
     call    #delay
     rlc.b   Message
     jc     P6OUT_1                     
-    
-     ; Read the value of X (for example, X is stored in R13)
-     ; tst.b   Message          ; Compare X (stored in R13) with 0
-     ;   jz      P6OUT_0          ; If X is 0, jump to P6OUT_0 (set P6.0 low)
-
     bic.b   #SDA, &P6OUT
     jmp     END_SEND         
 
@@ -173,6 +171,26 @@ delay:
     ret                         ; Loop is done
 
 ;-End Delay----------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Manual Acknowledge
+;------------------------------------------------------------------------------
+i2c_send_ack:
+    bic.b   #SDA, P6OUT
+    mov.w   #01h, Delay
+    call    #delay
+
+    bis.b   #SCL, P6OUT
+    mov.w   #01h, Delay
+    call    #delay
+
+    bic.b   #SCL, P6OUT
+    mov.w   #01h, Delay
+    call    #delay
+
+    ret    
+
+;-End Manual Ack---------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Acknowledge
