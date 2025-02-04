@@ -102,7 +102,7 @@ i2c_start:
 i2c_end:
     ;bic.b   #SDA, &P6OUT
     bis.b   #SCL, &P6OUT        ; Set SCL high
-    mov.w   #01h, R15           ; Short delay
+    mov.w   #05h, R15           ; Short delay
     call    #delay              ; Delay
 
     bis.b	#SDA, &P6OUT        ; Pull SDA high
@@ -115,13 +115,13 @@ i2c_end:
 
 ;-Send Message-----------------------------------------------------------------
 send_message:
-    mov.b   #07h, Send_count
-    bis.b   #0x01, &P6DIR    ; Configura P6.0 como salida (P6DIR = 0x01)
+    mov.b   #08h, Send_count
+    ;bis.b   #0x01, &P6DIR    ; Configura P6.0 como salida (P6DIR = 0x01)
 L2  call    #send_byte
     bic.b   #SCL, &P6OUT
-    mov.w	#5, R15     		; Long delay 
+    mov.w	#05, R15     		; Long delay 
     call    #delay
-    rla.b   Message                    
+    ;rla.b   Message                    
     dec.w   Send_count
     jnz     L2
     ret
@@ -130,12 +130,17 @@ L2  call    #send_byte
 send_byte:
 
     ; Read the value of X (for example, X is stored in R12)
-    tst.b   Message          ; Compare X (stored in R13) with 0
-    jz      P6OUT_0          ; If X is 0, jump to P6OUT_0 (set P6.0 low)
+    ;tst.b   Message          ; Compare X (stored in R13) with 0
+    ;jz      P6OUT_0          ; If X is 0, jump to P6OUT_0 (set P6.0 low)
 
+    clrc
+    rlc.b   Message
+    jnc     P6OUT_0
+
+P6OUT_1:
     bis.b   #0x01, &P6OUT    ; If X is 1, set P6.0 high/Set P6.0 high (1)
     bis.b   #SDA, &P6OUT
-    mov.w	#5, R15     		; Long delay
+    mov.w	#1, R15     		; Long delay
     call    #delay
     bis.b   #SCL, &P6OUT
     jmp     END_SEND         
@@ -143,7 +148,7 @@ send_byte:
 P6OUT_0:                     ; Jump here if X was 0
     bic.b   #0x01, &P6OUT    ; Set P6.0 low (0)
     bic.b   #SDA, &P6OUT
-    mov.w	#5, R15     		; Long delay
+    mov.w	#1, R15     		; Long delay
     call    #delay
     bis.b   #SCL, &P6OUT
     ret
