@@ -73,10 +73,11 @@ init:
 main:
     nop
     mov.b   #055h, Message
-    call #i2c_start
-    call #send_message
-    call #i2c_end
-    jmp main
+    call    #i2c_start
+    call    #send_message
+    call    #i2c_send_ack
+    call    #i2c_end
+    jmp     main
 
 ;-End Main---------------------------------------------------------------------
 
@@ -100,7 +101,10 @@ i2c_start:
 ; End Condition
 ;------------------------------------------------------------------------------
 i2c_end:
-    ;bic.b   #SDA, &P6OUT
+    bic.b   #SDA, &P6OUT
+    mov.w   #05h, Delay
+    call    #delay
+    
     bis.b   #SCL, &P6OUT        ; Set SCL high
     mov.w   #05h, R15           ; Short delay
     call    #delay              ; Delay
@@ -117,7 +121,8 @@ i2c_end:
 send_message:
     mov.b   #08h, Send_count
     ;bis.b   #0x01, &P6DIR    ; Configura P6.0 como salida (P6DIR = 0x01)
-L2  call    #send_byte
+L2: 
+    call    #send_byte
     bic.b   #SCL, &P6OUT
     mov.w	#05, R15     		; Long delay 
     call    #delay
@@ -163,6 +168,26 @@ delay:
     ret                         ; Loop is done
 
 ;-End Delay----------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Manual Acknowledge
+;------------------------------------------------------------------------------
+i2c_send_ack:
+    bic.b   #SDA, P6OUT
+    mov.w   #01h, Delay
+    call    #delay
+
+    bis.b   #SCL, P6OUT
+    mov.w   #01h, Delay
+    call    #delay
+
+    bic.b   #SCL, P6OUT
+    mov.w   #01h, Delay
+    call    #delay
+
+    ret    
+
+;-End Manual Ack---------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Acknowledge
