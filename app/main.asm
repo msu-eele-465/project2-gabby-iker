@@ -86,11 +86,11 @@ main:
 ;------------------------------------------------------------------------------
 i2c_start:
     bic.b   #SDA, &P6OUT                    ; Set SDA low
-    mov.w   #01h, R15                       ; Short delay
+    mov.w   #01h, Delay                       ; Short delay
     call    #delay
 
     bic.b   #SCL, &P6OUT                    ; Set SCL low
-    mov.w   #05h, R15                       ; Long delay
+    mov.w   #05h, Delay                       ; Long delay
     call    #delay
 
     ret
@@ -106,11 +106,11 @@ i2c_end:
     call    #delay
     
     bis.b   #SCL, &P6OUT        ; Set SCL high
-    mov.w   #05h, R15           ; Short delay
+    mov.w   #05h, Delay         ; Short delay
     call    #delay              ; Delay
 
     bis.b	#SDA, &P6OUT        ; Pull SDA high
-    mov.w   #05h, R15           ; Long delay
+    mov.w   #05h, Delay         ; Long delay
     call    #delay
 
     ret
@@ -120,53 +120,40 @@ i2c_end:
 ;-Send Message-----------------------------------------------------------------
 send_message:
     mov.b   #08h, Send_count
-    bis.b   #0x01, &P6DIR    ; Configura P6.0 as an output (P6DIR = 0x01)
-L2  bic.b   #SCL, &P6OUT
-    mov.w	#5, R15     		; Long delay 
-    call    #delay
-    rlc.b   Message
-    jc     P6OUT_1                     
-    bic.b   #SDA, &P6OUT
-    jmp     END_SEND         
-
-P6OUT_1:                     ; Jump here if X was 1
-    
-     bis.b   #SDA, &P6OUT     ;SDA High because we send a 1       
-    
-END_SEND:
-    mov.w	#5, R15     	; Long delay
-    call    #delay
-    bis.b   #SCL, &P6OUT
-
+L2: 
+    call    #send_byte
+    bic.b   #SCL, &P6OUT
+    mov.w	#05, Delay     		; Long delay 
+    call    #delay         
     dec.w   Send_count
     jnz     L2
-    
     ret
+
 ;------------------------------------------------------------------------------
-
-
 ;Send Byte--------------------------------------------------------------------
-;send_byte:
+send_byte:
+    clrc
+    rla.b   Message
+    jnc     P6OUT_0
 
-    ; Read the value of X (for example, X is stored in R13)
-;    tst.b   Message          ; Compare X (stored in R13) with 0
- ;   jz      P6OUT_0          ; If X is 0, jump to P6OUT_0 (set P6.0 low)
+P6OUT_1:
+    bis.b   #SDA, &P6OUT
+    mov.w	#1, Delay     		; Short delay
+    call    #delay
+    bis.b   #SCL, &P6OUT
+    ret        
 
-    ;bis.b   #SDA, &P6OUT     ;SDA High because we send a 1   
-    ;jmp     END_SEND         
+P6OUT_0:                     ; Jump here if X was 0
+    bic.b   #SDA, &P6OUT
+    mov.w	#1, Delay     		; Short delay
+    call    #delay
+    bis.b   #SCL, &P6OUT
+    ret
 
-;P6OUT_0:                     ; Jump here if X was 0
-;    bic.b   #SDA, &P6OUT    
-    
-;END_SEND:
-;    mov.w	#5, R15     	; Long delay
-;    call    #delay
-;    bis.b   #SCL, &P6OUT
-;    ret
 ; Delay loop
 ;------------------------------------------------------------------------------
 delay:
-    dec.w   R15                 ; Decrement inner loop counter
+    dec.w   Delay                 ; Decrement inner loop counter
     jnz     delay               ; Loop is not done; keep decrementing
     ret                         ; Loop is done
 
@@ -199,17 +186,17 @@ i2c_ack_recieve:
     bis.b   #SDA, &P6DIR        ; Input mode (for now)
     bis.b	#SDA, &P6OUT		; Set pull-up resistor
 	bis.b	#SDA, &P6REN		; Enable input PUD resistor
-	mov.w	#5, R15     		; Long delay
+	mov.w	#5, Delay     		; Long delay
 
     bis.b   #SCL, P6OUT         ; Set SCL high
-    mov.w   #01h, R15           ; Short delay
+    mov.w   #01h, Delay           ; Short delay
     call    #delay
 
     mov.w   #P6IN, AckReg       ; Capture potential ACK/NACK
     and.b	#SDA, AckReg		; Clear all unimportant bits
 
     bic.b   #SCL, P6OUT         ; Set SCL low
-    mov.w   #05h, R15           ; Long delay
+    mov.w   #05h, Delay           ; Long delay
     call    #delay
 
     bic.b	#SDA, &P6REN		; Disable input PUD resistor
