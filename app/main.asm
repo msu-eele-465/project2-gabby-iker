@@ -76,6 +76,9 @@ main:
     call    #i2c_start
     call    #send_message
     call    #i2c_send_ack
+    mov.b   #41h, Message
+    call    #send_message
+    call    #i2c_send_ack
     call    #i2c_end
     jmp     main
 
@@ -86,11 +89,11 @@ main:
 ;------------------------------------------------------------------------------
 i2c_start:
     bic.b   #SDA, &P6OUT                    ; Set SDA low
-    mov.w   #01h, Delay                       ; Short delay
+    mov.w   #01h, Delay                     ; Short delay
     call    #delay
 
     bic.b   #SCL, &P6OUT                    ; Set SCL low
-    mov.w   #05h, Delay                       ; Long delay
+    mov.w   #05h, Delay                     ; Long delay
     call    #delay
 
     ret
@@ -117,7 +120,9 @@ i2c_end:
 
 ;-End End Condition------------------------------------------------------------
 
-;-Send Message-----------------------------------------------------------------
+;------------------------------------------------------------------------------
+; Send Message
+;------------------------------------------------------------------------------
 send_message:
     mov.b   #08h, Send_count
 L2: 
@@ -129,8 +134,6 @@ L2:
     jnz     L2
     ret
 
-;------------------------------------------------------------------------------
-;Send Byte--------------------------------------------------------------------
 send_byte:
     clrc
     rla.b   Message
@@ -143,13 +146,15 @@ P6OUT_1:
     bis.b   #SCL, &P6OUT
     ret        
 
-P6OUT_0:                     ; Jump here if X was 0
+P6OUT_0:                        ; Jump here if X was 0
     bic.b   #SDA, &P6OUT
     mov.w	#1, Delay     		; Short delay
     call    #delay
     bis.b   #SCL, &P6OUT
     ret
+;-End Send Message-------------------------------------------------------------
 
+;------------------------------------------------------------------------------
 ; Delay loop
 ;------------------------------------------------------------------------------
 delay:
@@ -157,7 +162,7 @@ delay:
     jnz     delay               ; Loop is not done; keep decrementing
     ret                         ; Loop is done
 
-;-End Delay----------------------------------------------------------------------------
+;-End Delay--------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Manual Acknowledge
