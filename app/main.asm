@@ -9,7 +9,7 @@
 
 ;-------------------------------------------------------------------------------
 ; Include files
-            .cdecls C,LIST,"msp430.h"  ; Include device header file
+            .cdecls C,LIST,"msp430.h"       ; Include device header file
 ;-------------------------------------------------------------------------------
 
             .def    RESET                   ; Export program entry-point to
@@ -63,6 +63,9 @@ init:
     bis.b   #SCL, &P6DIR                    ; Output mode
     bis.b   #SCL, &P6OUT                    ; Initially high
 
+    ; Initialize slave address
+    mov.b   #0AAh, Message                  ; Set register address 55h, write bit
+
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
 ;-End Initialize---------------------------------------------------------------
 
@@ -71,29 +74,37 @@ init:
 ; Main
 ;------------------------------------------------------------------------------
 main:
-    nop
-    mov.b   #055h, Message
-    call    #i2c_start
-    call    #send_message
-    call    #i2c_send_ack
-    mov.b   #41h, Message
-    call    #send_message
-    call    #i2c_send_ack
-    call    #i2c_end
+    call    #i2c_routine
     jmp     main
 
 ;-End Main---------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
+; I2C routine
+;------------------------------------------------------------------------------
+; ToDo: confirm i2c_routine works
+i2c_routine:
+    call    #i2c_start          ; Trigger start condition
+    call    #i2c_send           ; Send the register address
+    call    #i2c_ack_recieve    ; Recieve ack/nack
+    mov.b   #41h, Message       ; Set the first byte of information
+    call    #i2c_send           ; Send the byte
+    call    #i2c_ack_recieve    ; Recieve ack/nack
+    call    #i2c_end            ; Trigger stop condition
+    ret
+
+;-End I2C routine--------------------------------------------------------------
+
+;------------------------------------------------------------------------------
 ; Start Condition
 ;------------------------------------------------------------------------------
 i2c_start:
-    bic.b   #SDA, &P6OUT                    ; Set SDA low
-    mov.w   #01h, Delay                     ; Short delay
+    bic.b   #SDA, &P6OUT        ; Set SDA low
+    mov.w   #01h, Delay         ; Short delay
     call    #delay
 
-    bic.b   #SCL, &P6OUT                    ; Set SCL low
-    mov.w   #05h, Delay                     ; Long delay
+    bic.b   #SCL, &P6OUT        ; Set SCL low
+    mov.w   #05h, Delay         ; Long delay
     call    #delay
 
     ret
@@ -104,8 +115,8 @@ i2c_start:
 ; End Condition
 ;------------------------------------------------------------------------------
 i2c_end:
-    bic.b   #SDA, &P6OUT
-    mov.w   #05h, Delay
+    bic.b   #SDA, &P6OUT        ; Set SDA low
+    mov.w   #05h, Delay         ; Long Delay
     call    #delay
     
     bis.b   #SCL, &P6OUT        ; Set SCL high
@@ -123,34 +134,31 @@ i2c_end:
 ;------------------------------------------------------------------------------
 ; Send Message
 ;------------------------------------------------------------------------------
-send_message:
-    mov.b   #08h, Send_count
-L2: 
-    call    #send_byte
-    bic.b   #SCL, &P6OUT
+i2c_send:
+    mov.b   #08h, Send_count    ; Send an 8-bit message
+i2c_send_loop: 
+    call    #i2c_send_rotate
+    bic.b   #SCL, &P6OUT        ; Set SCL low
     mov.w	#05, Delay     		; Long delay 
-    call    #delay         
-    dec.w   Send_count
-    jnz     L2
+    call    #delay
+    dec.w   Send_count          ; Decrement counter
+    jnz     i2c_send_loop       ; Counter non-zero, more bits to send
     ret
-
-send_byte:
-    clrc
-    rla.b   Message
-    jnc     P6OUT_0
-
-P6OUT_1:
-    bis.b   #SDA, &P6OUT
+i2c_send_rotate:
+    clrc                        ; Clear the carry flag
+    rla.b   Message             ; Rotate the MSB to the carry flag
+    jnc     i2c_send_low        ; Set SDA low if carry flag is zero
+i2c_send_high:
+    bis.b   #SDA, &P6OUT        ; Sed SDA high
     mov.w	#1, Delay     		; Short delay
     call    #delay
-    bis.b   #SCL, &P6OUT
-    ret        
-
-P6OUT_0:                        ; Jump here if X was 0
-    bic.b   #SDA, &P6OUT
+    bis.b   #SCL, &P6OUT        ; Set SDA high
+    ret
+i2c_send_low:
+    bic.b   #SDA, &P6OUT        ; Set SDA low
     mov.w	#1, Delay     		; Short delay
     call    #delay
-    bis.b   #SCL, &P6OUT
+    bis.b   #SCL, &P6OUT        ; Set SCL high
     ret
 ;-End Send Message-------------------------------------------------------------
 
@@ -158,7 +166,7 @@ P6OUT_0:                        ; Jump here if X was 0
 ; Delay loop
 ;------------------------------------------------------------------------------
 delay:
-    dec.w   Delay                 ; Decrement inner loop counter
+    dec.w   Delay               ; Decrement loop counter
     jnz     delay               ; Loop is not done; keep decrementing
     ret                         ; Loop is done
 
@@ -167,17 +175,17 @@ delay:
 ;------------------------------------------------------------------------------
 ; Manual Acknowledge
 ;------------------------------------------------------------------------------
-i2c_send_ack:
-    bic.b   #SDA, P6OUT
-    mov.w   #01h, Delay
+i2c_ack_send:
+    bic.b   #SDA, P6OUT         ; Set SDA low
+    mov.w   #01h, Delay         ; Short delay
     call    #delay
 
-    bis.b   #SCL, P6OUT
-    mov.w   #01h, Delay
+    bis.b   #SCL, P6OUT         ; Set SCL high
+    mov.w   #01h, Delay         ; Short delay
     call    #delay
 
-    bic.b   #SCL, P6OUT
-    mov.w   #01h, Delay
+    bic.b   #SCL, P6OUT         ; Set SCL low
+    mov.w   #01h, Delay         ; Short delay
     call    #delay
 
     ret    
@@ -194,14 +202,14 @@ i2c_ack_recieve:
 	mov.w	#5, Delay     		; Long delay
 
     bis.b   #SCL, P6OUT         ; Set SCL high
-    mov.w   #01h, Delay           ; Short delay
+    mov.w   #01h, Delay         ; Short delay
     call    #delay
 
     mov.w   #P6IN, AckReg       ; Capture potential ACK/NACK
     and.b	#SDA, AckReg		; Clear all unimportant bits
 
     bic.b   #SCL, P6OUT         ; Set SCL low
-    mov.w   #05h, Delay           ; Long delay
+    mov.w   #05h, Delay         ; Long delay
     call    #delay
 
     bic.b	#SDA, &P6REN		; Disable input PUD resistor
