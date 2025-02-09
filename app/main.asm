@@ -1,6 +1,6 @@
 ;-------------------------------------------------------------------------------
 ; EELE 465, Project 2, 23 January 2025
-; Gabriella Lord
+; Gabriella Lord and Iker Sal Maturana
 ;
 ; P6.0  SDA (Serial Data Line)
 ; P6.1  SCL (Serial clock line)
@@ -41,6 +41,10 @@ Delay       .set    R15
 Send_count  .set    R14
 Message     .set    R13
 AckReg      .set    R12                     ; Acknowledge flag
+Dummy_count .set    R11
+Byte_count  .set    R10
+Byte        .set    R9
+
 ;-End Constants----------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
@@ -71,48 +75,58 @@ init:
 ; Main
 ;------------------------------------------------------------------------------
 main:
+    mov.b   #0AAh, Message      ; Set the slave address here
+    mov.b   #02h, Byte_count    ; Set the number of bytes to send
+    mov.b   #00h, Dummy_count   ; Set the dummy count byte to zero
     call    #i2c_routine
+
+    call    #count_up
+    
     jmp     main
 
 ;-End Main---------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
+; Dummy count up
+;------------------------------------------------------------------------------
+count_up:
+    mov.b   Dummy_count, Byte
+    inc     Dummy_count
+    call    #i2c_routine_loop
+    ret
+
+;-End Count up-----------------------------------------------------------------
+
+;------------------------------------------------------------------------------
 ; I2C routine
 ;------------------------------------------------------------------------------
 i2c_routine:
-    mov.b   #0AAh, Message      ; Set register address 55h, write bit
-    call    #i2c_start          ; Trigger start condition
+    call    #i2c_routine_start  ; Trigger start condition
     call    #i2c_send           ; Send the register address
     call    #i2c_ack_recieve    ; Recieve ack/nack
-i2c_first_byte:
-    mov.b   #41h, Message       ; Set the first byte of information
-    call    #i2c_send           ; Send the byte
-    call    #i2c_ack_recieve    ; Recieve ack/nack
-    call    #i2c_end            ; Trigger stop condition
+; ToDo: fix the dummy count
+i2c_routine_loop:
+    mov.b   Dummy_count, Byte
+    inc     Dummy_count
+    call    #i2c_routine_continue
+    dec.w   Byte_count
+    jz      i2c_routine_end
     ret
-
-;-End I2C routine--------------------------------------------------------------
-
-;------------------------------------------------------------------------------
-; Start Condition
-;------------------------------------------------------------------------------
-i2c_start:
+i2c_routine_start:
     call    #i2c_sda_low        ; Set SDA low
     call    #i2c_scl_low        ; Set SCL low
     ret
-
-;-End Start Condition---------------------------------------------------------------------
-
-;------------------------------------------------------------------------------
-; End Condition
-;------------------------------------------------------------------------------
-i2c_end:
+i2c_routine_continue:
+    call    #i2c_send           ; Send the byte
+    call    #i2c_ack_recieve    ; Recieve ack/nack
+    ret
+i2c_routine_end:
     call    #i2c_sda_low        ; Set SDA low
     call    #i2c_scl_high       ; Set SCL high
     call    #i2c_sda_high       ; Set SDA high
     ret
 
-;-End End Condition------------------------------------------------------------
+;-End I2C routine--------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Send Message
@@ -154,20 +168,22 @@ i2c_ack_send:
 ; Acknowledge Recieve from Slave
 ;------------------------------------------------------------------------------
 i2c_ack_recieve:
-    bis.b   #SDA, &P6DIR        ; Input mode (for now)
+    bic.b   #SDA, &P6DIR        ; Input mode (for now)
+    bis.b	#SDA, &P6REN		; Enable input PUD resistor
     bis.b	#SDA, &P6OUT		; Set pull-up resistor
-	bis.b	#SDA, &P6REN		; Enable input PUD resistor
-	mov.w	#05h, Delay         ; Long delay
+	
+	mov.w	#05h, Delay         ; Short delay
+    call    #delay
 
-    bis.b   #SCL, P6OUT         ; Set SCL high
-    mov.w   #01h, Delay         ; Short delay
+    call    #i2c_scl_high       ; Set SCL high
+    mov.w   #05h, Delay
     call    #delay
 
     mov.w   #P6IN, AckReg       ; Capture potential ACK/NACK
     and.b	#SDA, AckReg		; Clear all unimportant bits
 
-    bic.b   #SCL, P6OUT         ; Set SCL low
-    mov.w   #05h, Delay         ; Long delay
+    call    #i2c_scl_low        ; Set SCL low
+    mov.w   #05h, Delay
     call    #delay
 
     bic.b	#SDA, &P6REN		; Disable input PUD resistor
