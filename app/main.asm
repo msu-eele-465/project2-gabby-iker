@@ -42,7 +42,7 @@ Send_count  .set    R14
 Message     .set    R13
 AckReg      .set    R12                     ; Acknowledge flag
 Dummy_count .set    R11
-Byte_count  .set    R10
+Dummy_max   .set    R10
 Byte        .set    R9
 
 ;-End Constants----------------------------------------------------------------
@@ -75,24 +75,27 @@ init:
 ; Main
 ;------------------------------------------------------------------------------
 main:
-    mov.b   #0AAh, Message      ; Set the slave address here
-    mov.b   #02h, Byte_count    ; Set the number of bytes to send
-    mov.b   #00h, Dummy_count   ; Set the dummy count byte to zero
-    call    #i2c_routine
-
-    call    #count_up
-    
-    jmp     main
+    mov.b   #0AAh, Message      ; Set the slave address here (Extra Credit)
+    mov.b   #09h, Dummy_max     ; Set how high dummy counter should go (Extra Credit)
+    call    #i2c_routine        ; Initiate the I2C routine
+    call    #dummy_count        ; Send the dummy count to the slave
+    jmp     main                ; Loop infinitely
 
 ;-End Main---------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Dummy count up
 ;------------------------------------------------------------------------------
-count_up:
-    mov.b   Dummy_count, Byte
-    inc     Dummy_count
-    call    #i2c_routine_loop
+dummy_count:
+    mov.b   #00h, Dummy_count       ; Set dummy count to zero
+    inc     Dummy_max               ; Increment so dummy count reaches desired value
+dummy_count_incr:
+    mov.b   Dummy_count, Message    ; Set dummy count as the byte to send to slave
+    inc     Dummy_count             ; Increment dummy count
+    call    #i2c_routine_continue   ; Send dummy count to slave
+    cmp.b   Dummy_count, Dummy_max  ; Check if dummy count has reached desired value
+    jnz     dummy_count_incr        ; Dummy count below desired value, send next value
+    call    #i2c_routine_end        ; Dummy count reached desired value, end I2C routine
     ret
 
 ;-End Count up-----------------------------------------------------------------
@@ -104,13 +107,6 @@ i2c_routine:
     call    #i2c_routine_start  ; Trigger start condition
     call    #i2c_send           ; Send the register address
     call    #i2c_ack_recieve    ; Recieve ack/nack
-; ToDo: fix the dummy count
-i2c_routine_loop:
-    mov.b   Dummy_count, Byte
-    inc     Dummy_count
-    call    #i2c_routine_continue
-    dec.w   Byte_count
-    jz      i2c_routine_end
     ret
 i2c_routine_start:
     call    #i2c_sda_low        ; Set SDA low
@@ -154,36 +150,24 @@ i2c_send_low:
 ;-End Send Message-------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
-; Acknowledge Send from Master
-;------------------------------------------------------------------------------
-i2c_ack_send:
-    call    #i2c_sda_low        ; Set SDA low
-    call    #i2c_scl_high       ; Set SCL high
-    call    #i2c_scl_low        ; Set SCL low
-    ret    
-
-;-End Ack Send-----------------------------------------------------------------
-
-;------------------------------------------------------------------------------
 ; Acknowledge Recieve from Slave
 ;------------------------------------------------------------------------------
 i2c_ack_recieve:
     bic.b   #SDA, &P6DIR        ; Input mode (for now)
     bis.b	#SDA, &P6REN		; Enable input PUD resistor
     bis.b	#SDA, &P6OUT		; Set pull-up resistor
-	
 	mov.w	#05h, Delay         ; Short delay
     call    #delay
 
     call    #i2c_scl_high       ; Set SCL high
-    mov.w   #05h, Delay
+    mov.w   #05h, Delay         ; Long delay
     call    #delay
 
     mov.w   #P6IN, AckReg       ; Capture potential ACK/NACK
     and.b	#SDA, AckReg		; Clear all unimportant bits
 
     call    #i2c_scl_low        ; Set SCL low
-    mov.w   #05h, Delay
+    mov.w   #05h, Delay         ; Long delay
     call    #delay
 
     bic.b	#SDA, &P6REN		; Disable input PUD resistor
@@ -201,19 +185,16 @@ i2c_sda_high:
     mov.w   #01h, Delay         ; Short delay
     call    #delay
     ret
-
 i2c_sda_low:
     bic.b   #SDA, P6OUT         ; Set SDA low
     mov.w   #01h, Delay         ; Short delay
     call    #delay
     ret
-
 i2c_scl_high:
     bis.b   #SCL, P6OUT         ; Set SCL high
     mov.w   #01h, Delay         ; Short delay
     call    #delay
     ret
-
 i2c_scl_low:
     bic.b   #SCL, P6OUT         ; Set SCL low
     mov.w   #01h, Delay         ; Short delay
@@ -229,6 +210,16 @@ delay:
     jnz     delay               ; Loop is not done; keep decrementing
     ret                         ; Loop is done
 ;-End Delay--------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Acknowledge Send from Master
+;------------------------------------------------------------------------------
+i2c_ack_send:
+    call    #i2c_sda_low        ; Set SDA low
+    call    #i2c_scl_high       ; Set SCL high
+    call    #i2c_scl_low        ; Set SCL low
+    ret    
+;-End Ack Send-----------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Interrupt Vectors
