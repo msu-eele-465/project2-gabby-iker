@@ -37,13 +37,12 @@ I2C         .set    SDA + SCL               ; I2C pins
 ;I2CSEL0     .set    P6SEL0                  ; I2C port selection register 0
 ;I2CSEL1     .set    P6SEL1                  ; I2C port selection register 1
 ;I2CSELC     .set    P6SELC                  ; I2C complement selection (likely unused)
-Delay       .set    R15
-Send_count  .set    R14
-Message     .set    R13
+Delay       .set    R15                     ; Length of delay
+Send_count  .set    R14                     ; Bit size of messages
+Message     .set    R13                     ; Message to transmitted and recieved
 AckReg      .set    R12                     ; Acknowledge flag
-Dummy_count .set    R11
-Dummy_max   .set    R10
-Byte        .set    R9
+Dummy_count .set    R11                     ; Counts up from 0 to Dummy_max (eg 0 to 9)
+Dummy_max   .set    R10                     ; Value Dummy_count counts up to
 
 ;-End Constants----------------------------------------------------------------
 
@@ -70,7 +69,6 @@ init:
     bic.w   #LOCKLPM5,&PM5CTL0              ; Disable low-power mode
 ;-End Initialize---------------------------------------------------------------
 
-
 ;------------------------------------------------------------------------------
 ; Main
 ;------------------------------------------------------------------------------
@@ -79,9 +77,33 @@ main:
     mov.b   #09h, Dummy_max     ; Set how high dummy counter should go (Extra Credit)
     call    #i2c_routine        ; Initiate the I2C routine
     call    #dummy_count        ; Send the dummy count to the slave
+    call    #i2c_routine_end    ; Dummy count reached desired value, end I2C routine
     jmp     main                ; Loop infinitely
-
 ;-End Main---------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; RTC stuff
+;------------------------------------------------------------------------------
+rtc:
+    mov.b   #00h, Message       ; Write to seconds register
+    mov.b   #01h, Message       ; Read from seconds register
+    
+    mov.b   #02h, Message       ; Write to minutes register
+    mov.b   #03h, Message       ; Read from minutes register
+    
+    mov.b   #04h, Message       ; Write to hours register
+    mov.b   #05h, Message       ; Read from hours register
+
+    mov.b   #06h, Message       ; Write to day register
+    mov.b   #07h, Message       ; Read from day register
+
+    mov.b   #08h, Message       ; Write to date register
+    mov.b   #09h, Message       ; Read from date register
+
+    mov.b   #0Ah, Message       ; Write to month/century register
+    mov.b   #0Bh, Message       ; Read from month/century register
+;-End Main---------------------------------------------------------------------
+
 
 ;------------------------------------------------------------------------------
 ; Dummy count up
@@ -95,13 +117,12 @@ dummy_count_incr:
     call    #i2c_routine_continue   ; Send dummy count to slave
     cmp.b   Dummy_count, Dummy_max  ; Check if dummy count has reached desired value
     jnz     dummy_count_incr        ; Dummy count below desired value, send next value
-    call    #i2c_routine_end        ; Dummy count reached desired value, end I2C routine
     ret
 
 ;-End Count up-----------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
-; I2C routine
+; I2C send routine
 ;------------------------------------------------------------------------------
 i2c_routine:
     call    #i2c_routine_start  ; Trigger start condition
@@ -121,7 +142,6 @@ i2c_routine_end:
     call    #i2c_scl_high       ; Set SCL high
     call    #i2c_sda_high       ; Set SDA high
     ret
-
 ;-End I2C routine--------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
@@ -175,7 +195,7 @@ i2c_ack_recieve:
     
     ret
 
-;-End Ack Recieve---------------------------------------------------------------
+;-End Ack Recieve--------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ; Control SDA and SCL
