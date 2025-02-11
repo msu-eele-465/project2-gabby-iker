@@ -3,3 +3,5 @@
 
 In this project, you'll bit-bang i2c and communicate with a real-time clock.
 
+Sources used:
+- ChatGPT for general guidance. We did not track our transcripts but replaced everything from ChatGPT with better code. We will track our ChatGPT transcripts in the future.
